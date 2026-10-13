@@ -1,0 +1,13 @@
+import {createRequire} from 'node:module';
+import {spawnSync} from 'node:child_process';
+import {mkdtempSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const dir=mkdtempSync(path.join(tmpdir(),'le-auth-validation-'));const compile=spawnSync(process.execPath,['node_modules/typescript/bin/tsc','lib/auth-validation.ts','--outDir',dir,'--module','commonjs','--target','es2022','--skipLibCheck'],{encoding:'utf8'});assert.equal(compile.status,0,compile.stdout+compile.stderr);
+const {validateAuth}=createRequire(import.meta.url)(path.join(dir,'auth-validation.js'));
+assert.deepEqual(Object.keys(validateAuth('register',{})),['name','email','password','confirmPassword','terms']);
+const valid={name:'Reader',email:'reader@example.com',password:'a long secure phrase',confirmPassword:'a long secure phrase',terms:true};assert.deepEqual(validateAuth('register',valid),{});
+assert.ok(validateAuth('register',{...valid,confirmPassword:'different'}).confirmPassword);assert.ok(validateAuth('register',{...valid,email:'not an email'}).email);assert.ok(validateAuth('register',{...valid,password:'short',confirmPassword:'short'}).password);
+assert.deepEqual(validateAuth('login',{email:valid.email,password:'existing-short-password'}),{});assert.ok(validateAuth('login',{email:valid.email}).password);assert.deepEqual(validateAuth('forgot',{email:valid.email}),{});assert.deepEqual(validateAuth('reset',{password:valid.password,confirmPassword:valid.password}),{});
+console.log('PASS: empty form, email, password length, confirm-password mismatch, terms acceptance, login, reset validation.');
